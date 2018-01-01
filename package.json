@@ -1,0 +1,29 @@
+{
+  "name": "blackspider",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blackmiaool/blackspider.git"
+  },
+  "keywords": [],
+  "author": "blackmiaool",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/blackmiaool/blackspider/issues"
+  },
+  "homepage": "https://github.com/blackmiaool/blackspider#readme",
+  "dependencies": {
+    "blacksocket.io": "^1.0.42",
+    "finalhandler": "^1.1.0",
+    "fs-extra": "^5.0.0",
+    "pdfkit": "^0.8.3",
+    "request": "^2.83.0",
+    "serve-me": "^0.8.3",
+    "serve-static": "^1.13.1"
+  }
+}

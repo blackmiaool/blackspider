@@ -1,6 +1,5 @@
 var http = require('http');
 const { URL } = require('url');
-const images = require('./test2');
 const fs = require('fs-extra');
 const getIp = require('./getip');
 

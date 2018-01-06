@@ -2,9 +2,10 @@ var http = require('http');
 const { URL } = require('url');
 const fs = require('fs-extra');
 const getIp = require('./getip');
-
-const port = 33326;
-const nginxPort = 33327;
+const domain = require('./config');
+const md5 = require('md5')
+const ajaxPort = 33326;
+const staticPort = 33327;
 function download(source, path) {
     return new Promise((resolve) => {
         const file = fs.createWriteStream(path);
@@ -18,7 +19,6 @@ function download(source, path) {
                 'Upgrade-Insecure-Requests': '1',
                 'Pragma': 'no-cache',
                 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.96 Safari/537.36',
-
             }
         }, { hostname: url.hostname, port: 80, path: url.pathname, 'protocol': 'http:' });
         const request = http.get(options, function (response) {
@@ -58,7 +58,7 @@ var server = http.createServer(function onRequest(req, res) {
 })
 
 // Listen
-server.listen(nginxPort)
+server.listen(staticPort)
 function createPDF(sourcePath, length, targetPath) {
     const PDFDocument = require('pdfkit')
     doc = new PDFDocument();
@@ -79,37 +79,8 @@ function createPDF(sourcePath, length, targetPath) {
     }
     doc.end()
 }
-// createPDF('result/1514797855093',217,'result/1514797855093/1514797855093.pdf');
 
-// const io = require('blacksocket.io/server')(port, {
-//     path: '/test'
-// });
-// io.on('connection', function (socket) {
-//     socket.on('task', async (list) => {
-//         const time = Date.now();
-//         const targetFolder = `result/${time}`;
-
-//         await fs.ensureDir(targetFolder);
-//         for (let i = 0; i < list.length; i++) {
-//             await download(list[i], `${targetFolder}/${i + 1}.jpg`);
-//             socket.emit('progress', i + '');
-//         }
-//         const target = `${targetFolder}.pdf`;
-//         createPDF(targetFolder, list.length, target);
-//         return `http://${getIp()[0]}:${nginxPort}/${target}`;
-//     });
-// });
-// process.on('uncaughtException', (err) => {
-//     console.error(err.stack);
-//     console.log('Node NOT Exiting...');
-// });
-// process.on('unhandledRejection', (reason, p) => {
-//     console.log('Unhandled Rejection at:', p, 'reason:', reason);
-//     // application specific logging, throwing an error, or other logic here
-// });
-console.log(getIp());
-
-
+console.log('running on domain:', domain);
 const Koa = require('koa');
 const app = new Koa();
 var bodyParser = require('koa-bodyparser');
@@ -121,15 +92,21 @@ app.use(bodyParser());
 let progressMap = {};
 app.use(async ctx => {
     const params = ctx.request.body;
-    console.log(params);
-    console.log(ctx.path)
+    if(md5(params.user)!=='56d04df8b65cf0b369a65b41a905eaa3'){
+        return ;
+    }
     ctx.set('Access-Control-Allow-Origin', ctx.request.header.origin);
 
     if (ctx.path === "/task") {
-        console.log(1);
-        const time = Date.now();
-        const targetFolder = `result/${time}`;
-        const { list, id } = params;
+        let { list, id } = params;
+        id = md5(id);
+        const targetFolder = `result/${id}`;
+        const targetPdf = `${targetFolder}.pdf`;
+        const finalUrl = `http://${domain}:${staticPort}/${targetPdf}`.replace(/\/result/, '');
+        const exist=await fs.pathExists(targetPdf);       
+        if(exist) {
+            progressMap[id]=finalUrl;
+        }
         async function doDownload() {
             await fs.ensureDir(targetFolder);
             for (let i = 0; i < list.length; i++) {
@@ -137,9 +114,7 @@ app.use(async ctx => {
                 await download(list[i], `${targetFolder}/${i + 1}.jpg`);
                 progressMap[id] = `${i}/${list.length}`;
             }
-            const target = `${targetFolder}.pdf`;
-            createPDF(targetFolder, list.length, target);
-            const finalUrl = `http://${getIp()[0]}:${nginxPort}/${target}`;
+            createPDF(targetFolder, list.length, targetPdf);            
             progressMap[id] = finalUrl;
         }
         if (!progressMap[id]) {
@@ -149,9 +124,10 @@ app.use(async ctx => {
         ctx.body = JSON.stringify({ code: 0 });
 
     } else if (ctx.path === '/progress') {
-        const { id } = params;
+        let { id } = params;
+        id = md5(id);
         ctx.body = progressMap[id];
     }
 });
 
-app.listen(25334);
+app.listen(ajaxPort);

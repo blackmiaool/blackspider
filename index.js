@@ -87,7 +87,10 @@ var bodyParser = require('koa-bodyparser');
 var exec = require('child_process').exec;
 var sys = require('util')
 
-app.use(bodyParser());
+app.use(bodyParser({
+    formLimit:'10mb',
+    jsonLimit:'10mb'
+}));
 // response
 let progressMap = {};
 app.use(async ctx => {

@@ -21,6 +21,8 @@
     "blacksocket.io": "^1.0.42",
     "finalhandler": "^1.1.0",
     "fs-extra": "^5.0.0",
+    "koa": "^2.4.1",
+    "koa-bodyparser": "^4.2.0",
     "pdfkit": "^0.8.3",
     "request": "^2.83.0",
     "serve-me": "^0.8.3",

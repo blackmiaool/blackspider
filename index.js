@@ -102,6 +102,9 @@ app.use(async ctx => {
 
     if (ctx.path === "/task") {
         let { list, id } = params;
+        if(typeof list==='string'){
+            list=JSON.parse(list);
+        }
         id = md5(id);
         const targetFolder = `result/${id}`;
         const targetPdf = `${targetFolder}.pdf`;

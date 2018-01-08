@@ -6,8 +6,9 @@ const domain = require('./config');
 const md5 = require('md5')
 const ajaxPort = 33326;
 const staticPort = 33327;
+const parallelTask = require('./parallelTask');
 function download(source, path) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const file = fs.createWriteStream(path);
         let url = new URL(source);
         const options = Object.assign({
@@ -22,6 +23,11 @@ function download(source, path) {
             }
         }, { hostname: url.hostname, port: 80, path: url.pathname, 'protocol': 'http:' });
         const request = http.get(options, function (response) {
+            const length = response.headers['content-length'] * 1;
+            if (length < 5000) {
+                reject(new Error('insufficient length'));
+                return;
+            }
             response.pipe(file);
             file.on('finish', function () {
                 resolve();
@@ -59,7 +65,7 @@ var server = http.createServer(function onRequest(req, res) {
 
 // Listen
 server.listen(staticPort)
-function createPDF(sourcePath, length, targetPath) {
+async function createPDF(sourcePath, length, targetPath) {
     const PDFDocument = require('pdfkit')
     doc = new PDFDocument();
     doc.pipe(fs.createWriteStream(targetPath));
@@ -75,7 +81,17 @@ function createPDF(sourcePath, length, targetPath) {
         if (i !== 1) {
             ref = doc.addPage();
         }
-        ref.image(`${sourcePath}/${i}.jpg`, 0, 0, option);
+        const file = `${sourcePath}/${i}.jpg`;
+        try{
+            const stats = await fs.stat(file);
+            if(stats.size<5000){
+                continue;
+            }
+        }catch(e){
+            continue;
+        }
+        
+        ref.image(file, 0, 0, option);
     }
     doc.end()
 }
@@ -88,39 +104,58 @@ var exec = require('child_process').exec;
 var sys = require('util')
 
 app.use(bodyParser({
-    formLimit:'10mb',
-    jsonLimit:'10mb'
+    formLimit: '10mb',
+    jsonLimit: '10mb'
 }));
 // response
 let progressMap = {};
 app.use(async ctx => {
     const params = ctx.request.body;
-    if(md5(params.user)!=='56d04df8b65cf0b369a65b41a905eaa3'){
-        return ;
+    if (md5(params.user) !== '56d04df8b65cf0b369a65b41a905eaa3') {
+        return;
     }
     ctx.set('Access-Control-Allow-Origin', ctx.request.header.origin);
 
     if (ctx.path === "/task") {
         let { list, id } = params;
-        if(typeof list==='string'){
-            list=JSON.parse(list);
+        if (typeof list === 'string') {
+            list = JSON.parse(list);
         }
         id = md5(id);
         const targetFolder = `result/${id}`;
         const targetPdf = `${targetFolder}.pdf`;
         const finalUrl = `http://${domain}:${staticPort}/${targetPdf}`.replace(/\/result/, '');
-        const exist=await fs.pathExists(targetPdf);       
-        if(exist) {
-            progressMap[id]=finalUrl;
+        const exist = await fs.pathExists(targetPdf);
+        if (exist) {
+            progressMap[id] = finalUrl;
         }
         async function doDownload() {
             await fs.ensureDir(targetFolder);
-            for (let i = 0; i < list.length; i++) {
-                console.log(list[i], `${targetFolder}/${i + 1}.jpg`);
-                await download(list[i], `${targetFolder}/${i + 1}.jpg`);
-                progressMap[id] = `${i}/${list.length}`;
-            }
-            createPDF(targetFolder, list.length, targetPdf);            
+            let imgCount = 0;
+            await parallelTask(async (index) => {
+                console.log('downloading', index);
+                progressMap[id] = `${index + 1}/${list.length}`;
+                try {
+                    imgCount++;
+                    await download(list[index], `${targetFolder}/${imgCount}.jpg`);
+                } catch (e) {
+
+                }
+            }, (index) => {
+                return index === list.length
+            }, 5);
+            // for (let i = 0; i < list.length; i++) {
+            //     console.log(list[i], `${targetFolder}/${i + 1}.jpg`);
+            //     try {
+            //         await download(list[i], `${targetFolder}/${imgCount + 1}.jpg`);
+            //         imgCount++;
+            //     } catch (e) {
+
+            //     }
+
+            //     progressMap[id] = `${i}/${list.length}`;
+            // }
+            await createPDF(targetFolder, imgCount, targetPdf);
             progressMap[id] = finalUrl;
         }
         if (!progressMap[id]) {

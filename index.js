@@ -90,8 +90,11 @@ async function createPDF(sourcePath, length, targetPath) {
         }catch(e){
             continue;
         }
-        
-        ref.image(file, 0, 0, option);
+        try{
+
+        }catch(e){
+            ref.image(file, 0, 0, option);
+        }        
     }
     doc.end()
 }

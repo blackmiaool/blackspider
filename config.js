@@ -1,1 +1,1 @@
-module.exports = "linode.blackmiaool.com";
+module.exports = "linode2.blackmiaool.com";
